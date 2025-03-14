@@ -4,6 +4,7 @@ import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as custom from "aws-cdk-lib/custom-resources";
 import * as apig from "aws-cdk-lib/aws-apigateway";
+import * as iam from 'aws-cdk-lib/aws-iam';
 import { Construct } from "constructs";
 import { generateBatch } from "../shared/util";
 import { courses, enrollments } from "../seed/courses";
@@ -77,6 +78,14 @@ export class CourseManagementApiStack extends cdk.Stack {
         REGION: 'eu-west-1',
       },
     });
+
+    translateCourseFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ['translate:TranslateText'],
+        resources: ['*'],
+      })
+    );
 
     // Initialize DynamoDB data
     new custom.AwsCustomResource(this, "coursesddbInitData", {
