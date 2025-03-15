@@ -99,6 +99,19 @@ export class CourseManagementApiStack extends cdk.Stack {
       },
     });
 
+    const updateCourseFn = new lambdanode.NodejsFunction(this, "UpdateCourseFn", {
+      architecture: lambda.Architecture.ARM_64,
+      runtime: lambda.Runtime.NODEJS_18_X,
+      entry: `${__dirname}/../lambdas/updateCourse.ts`,
+      timeout: cdk.Duration.seconds(10),
+      memorySize: 128,
+      environment: {
+        TABLE_NAME: coursesTable.tableName,
+        REGION: 'eu-west-1',
+      },
+    });
+    
+
     // Initialize DynamoDB data
     new custom.AwsCustomResource(this, "coursesddbInitData", {
       onCreate: {
@@ -124,6 +137,7 @@ export class CourseManagementApiStack extends cdk.Stack {
     coursesTable.grantReadWriteData(addCourseFn);
     coursesTable.grantReadWriteData(translateCourseFn);
     coursesTable.grantWriteData(deleteCourseFn);
+    coursesTable.grantReadWriteData(updateCourseFn);
 
     // API Gateway
     const api = new apig.RestApi(this, "CourseApi", {
@@ -170,6 +184,13 @@ export class CourseManagementApiStack extends cdk.Stack {
     courseEndpoint.addMethod(
       "DELETE",
       new apig.LambdaIntegration(deleteCourseFn, { proxy: true }),
+      {
+        apiKeyRequired: true
+      }
+    );
+    courseEndpoint.addMethod(
+      "PUT",
+      new apig.LambdaIntegration(updateCourseFn, { proxy: true }),
       {
         apiKeyRequired: true
       }
