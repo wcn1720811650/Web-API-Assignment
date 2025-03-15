@@ -29,6 +29,13 @@ export class CourseManagementApiStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       tableName: "Enrollments",
     });
+    const translationsTable = new dynamodb.Table(this, "TranslationsTable", {
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      partitionKey: { name: "originalText", type: dynamodb.AttributeType.STRING },
+      sortKey: { name: "targetLanguage", type: dynamodb.AttributeType.STRING },
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      tableName: "Translations",
+    });
 
     // Functions
     const getCourseByIdFn = new lambdanode.NodejsFunction(this, "GetCourseByIdFn", {
@@ -74,7 +81,8 @@ export class CourseManagementApiStack extends cdk.Stack {
       timeout: cdk.Duration.seconds(10),
       memorySize: 128,
       environment: {
-        TABLE_NAME: coursesTable.tableName,
+        COURSES_TABLE: coursesTable.tableName,
+        TRANSLATIONS_TABLE: translationsTable.tableName,
         REGION: 'eu-west-1',
       },
     });
@@ -110,6 +118,43 @@ export class CourseManagementApiStack extends cdk.Stack {
         REGION: 'eu-west-1',
       },
     });
+
+    const getEnrollmentsFn = new lambdanode.NodejsFunction(this, "GetEnrollmentsFn", {
+      architecture: lambda.Architecture.ARM_64,
+      runtime: lambda.Runtime.NODEJS_18_X,
+      entry: `${__dirname}/../lambdas/getEnrollments.ts`,
+      timeout: cdk.Duration.seconds(10),
+      memorySize: 128,
+      environment: {
+        TABLE_NAME: enrollmentsTable.tableName,
+        REGION: 'eu-west-1',
+      },
+    });
+
+    const addEnrollmentFn = new lambdanode.NodejsFunction(this, "AddEnrollmentFn", {
+      architecture: lambda.Architecture.ARM_64,
+      runtime: lambda.Runtime.NODEJS_18_X,
+      entry: `${__dirname}/../lambdas/addEnrollment.ts`,
+      timeout: cdk.Duration.seconds(10),
+      memorySize: 128,
+      environment: {
+        TABLE_NAME: enrollmentsTable.tableName,
+        REGION: 'eu-west-1',
+      },
+    });
+
+    const deleteEnrollmentFn = new lambdanode.NodejsFunction(this, "DeleteEnrollmentFn", {
+      architecture: lambda.Architecture.ARM_64,
+      runtime: lambda.Runtime.NODEJS_18_X,
+      entry: `${__dirname}/../lambdas/deleteEnrollment.ts`,
+      timeout: cdk.Duration.seconds(10),
+      memorySize: 128,
+      environment: {
+        TABLE_NAME: enrollmentsTable.tableName,
+        REGION: 'eu-west-1',
+      },
+    });
+
     
 
     // Initialize DynamoDB data
@@ -138,6 +183,10 @@ export class CourseManagementApiStack extends cdk.Stack {
     coursesTable.grantReadWriteData(translateCourseFn);
     coursesTable.grantWriteData(deleteCourseFn);
     coursesTable.grantReadWriteData(updateCourseFn);
+    enrollmentsTable.grantReadData(getEnrollmentsFn);
+    enrollmentsTable.grantWriteData(addEnrollmentFn);
+    enrollmentsTable.grantWriteData(deleteEnrollmentFn);
+    translationsTable.grantReadWriteData(translateCourseFn);
 
     // API Gateway
     const api = new apig.RestApi(this, "CourseApi", {
@@ -191,6 +240,28 @@ export class CourseManagementApiStack extends cdk.Stack {
     courseEndpoint.addMethod(
       "PUT",
       new apig.LambdaIntegration(updateCourseFn, { proxy: true }),
+      {
+        apiKeyRequired: true
+      }
+    );
+
+    const enrollmentsEndpoint = courseEndpoint.addResource("enrollments");
+    enrollmentsEndpoint.addMethod(
+      "GET",
+      new apig.LambdaIntegration(getEnrollmentsFn, { proxy: true })
+    );
+
+    enrollmentsEndpoint.addMethod(
+      "POST",
+      new apig.LambdaIntegration(addEnrollmentFn, { proxy: true }),
+      {
+        apiKeyRequired: true
+      }
+    );
+
+    enrollmentsEndpoint.addMethod(
+      "DELETE",
+      new apig.LambdaIntegration(deleteEnrollmentFn, { proxy: true }),
       {
         apiKeyRequired: true
       }

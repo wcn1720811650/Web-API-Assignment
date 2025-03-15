@@ -1,10 +1,10 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
-import { DynamoDB } from "aws-sdk";
-import { Translate } from "@aws-sdk/client-translate";
+import { DynamoDB, Translate } from "aws-sdk";
 
 const dynamodb = new DynamoDB.DocumentClient();
-const translate = new Translate({ region: process.env.REGION });
-const TABLE_NAME = process.env.TABLE_NAME || "";
+const translate = new Translate();
+const COURSES_TABLE = process.env.COURSES_TABLE || "";
+const TRANSLATIONS_TABLE = process.env.TRANSLATIONS_TABLE || "";
 
 export const handler = async (
   event: APIGatewayProxyEvent
@@ -12,7 +12,7 @@ export const handler = async (
   try {
     const departmentId = event.pathParameters?.departmentId;
     const courseId = event.queryStringParameters?.courseId;
-    const targetLanguage = event.queryStringParameters?.language || 'fr';
+    const targetLanguage = event.queryStringParameters?.language || "zh";
 
     if (!departmentId || !courseId) {
       return {
@@ -21,17 +21,16 @@ export const handler = async (
       };
     }
 
-    // Try to get cached translations first
-    const params = {
-      TableName: TABLE_NAME,
+    const courseParams = {
+      TableName: COURSES_TABLE,
       Key: {
         departmentId: departmentId,
         courseId: courseId,
       },
     };
 
-    const result = await dynamodb.get(params).promise();
-    const course = result.Item;
+    const courseResult = await dynamodb.get(courseParams).promise();
+    const course = courseResult.Item;
 
     if (!course) {
       return {
@@ -40,45 +39,49 @@ export const handler = async (
       };
     }
 
-    // Check if there is already a cached translation
-    const cacheKey = `translation_${targetLanguage}`;
-    if (course[cacheKey]) {
-      return {
-        statusCode: 200,
-        headers: {
-          "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "*",
-        },
-        body: JSON.stringify({
-          ...course,
-          description: course[cacheKey],
-          translated: true,
-          fromCache: true,
-        }),
-      };
+    const fieldsToTranslate = ["title", "description"];
+    const translatedCourse = { ...course };
+
+    for (const field of fieldsToTranslate) {
+      if (course[field]) {
+        const originalText = course[field];
+        
+        const cacheParams = {
+          TableName: TRANSLATIONS_TABLE,
+          Key: {
+            originalText: originalText,
+            targetLanguage: targetLanguage,
+          },
+        };
+        
+        const cacheResult = await dynamodb.get(cacheParams).promise();
+        
+        if (cacheResult.Item) {
+          translatedCourse[field] = cacheResult.Item.translatedText;
+        } else {
+          const translateParams = {
+            Text: originalText,
+            SourceLanguageCode: "en",
+            TargetLanguageCode: targetLanguage,
+          };
+          
+          const translateResult = await translate.translateText(translateParams).promise();
+          translatedCourse[field] = translateResult.TranslatedText;
+          
+          const putCacheParams = {
+            TableName: TRANSLATIONS_TABLE,
+            Item: {
+              originalText: originalText,
+              targetLanguage: targetLanguage,
+              translatedText: translateResult.TranslatedText,
+              timestamp: new Date().toISOString(),
+            },
+          };
+          
+          await dynamodb.put(putCacheParams).promise();
+        }
+      }
     }
-
-    const translateParams = {
-      Text: course.description,
-      SourceLanguageCode: "en",
-      TargetLanguageCode: targetLanguage,
-    };
-
-    const translationResult = await translate.translateText(translateParams);
-
-    const updateParams = {
-      TableName: TABLE_NAME,
-      Key: {
-        departmentId: departmentId,
-        courseId: courseId,
-      },
-      UpdateExpression: `set ${cacheKey} = :translation`,
-      ExpressionAttributeValues: {
-        ":translation": translationResult.TranslatedText,
-      },
-    };
-
-    await dynamodb.update(updateParams).promise();
 
     return {
       statusCode: 200,
@@ -86,17 +89,12 @@ export const handler = async (
         "Content-Type": "application/json",
         "Access-Control-Allow-Origin": "*",
       },
-      body: JSON.stringify({
-        ...course,
-        description: translationResult.TranslatedText,
-        translated: true,
-        fromCache: false,
-      }),
+      body: JSON.stringify(translatedCourse),
     };
   } catch (error) {
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: "Translation failed" }),
+      body: JSON.stringify({ error: "Could not translate course" }),
     };
   }
 };
