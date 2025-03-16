@@ -341,9 +341,19 @@ export class CourseManagementApiStack extends cdk.Stack {
 
     courseEndpoint.addMethod(
       "DELETE",
-      new apig.LambdaIntegration(deleteCourseFn, { proxy: true }),
+      new apig.LambdaIntegration(deleteCourseFn, { 
+        proxy: true,
+        requestParameters: {
+          'integration.request.path.departmentId': 'method.request.path.departmentId',
+          'integration.request.path.courseId': 'method.request.path.courseId'  
+        }
+      }),
       {
-        apiKeyRequired: true
+        apiKeyRequired: true,
+        requestParameters: {
+          'method.request.path.departmentId': true,
+          'method.request.path.courseId': true  
+        }
       }
     );
     courseEndpoint.addMethod(
@@ -389,9 +399,19 @@ export class CourseManagementApiStack extends cdk.Stack {
 
     enrollmentsEndpoint.addMethod(
       "DELETE",
-      new apig.LambdaIntegration(deleteEnrollmentFn, { proxy: true }),
+      new apig.LambdaIntegration(deleteEnrollmentFn, {
+        proxy: true,
+        requestParameters: {
+          'integration.request.path.departmentId': 'method.request.path.departmentId',
+          'integration.request.path.studentId': 'method.request.path.studentId'
+        }
+      }),
       {
-        apiKeyRequired: true
+        apiKeyRequired: true,
+        requestParameters: {
+          'method.request.path.departmentId': true,
+          'method.request.path.studentId': true
+        }
       }
     );
 
