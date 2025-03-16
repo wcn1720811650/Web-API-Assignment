@@ -355,16 +355,35 @@ export class CourseManagementApiStack extends cdk.Stack {
     );
 
     const enrollmentsEndpoint = courseEndpoint.addResource("enrollments");
-    enrollmentsEndpoint.addMethod(
-      "GET",
-      new apig.LambdaIntegration(getEnrollmentsFn, { proxy: true })
-    );
 
     enrollmentsEndpoint.addMethod(
-      "POST",
-      new apig.LambdaIntegration(addEnrollmentFn, { proxy: true }),
+      "GET",
+      new apig.LambdaIntegration(getEnrollmentsFn, {
+        proxy: true,
+        requestParameters: {
+          'integration.request.path.courseId': 'method.request.path.departmentId' 
+        }
+      }),
       {
-        apiKeyRequired: true
+        requestParameters: {
+          'method.request.path.departmentId': true 
+        }
+      }
+    );
+    
+    enrollmentsEndpoint.addMethod(
+      "POST",
+      new apig.LambdaIntegration(addEnrollmentFn, {
+        proxy: true,
+        requestParameters: {
+          'integration.request.path.departmentId': 'method.request.path.departmentId'
+        }
+      }),
+      {
+        apiKeyRequired: true,
+        requestParameters: {
+          'method.request.path.departmentId': true 
+        }
       }
     );
 

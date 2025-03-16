@@ -8,22 +8,22 @@ export const handler = async (
   event: APIGatewayProxyEvent
 ): Promise<APIGatewayProxyResult> => {
   try {
-    const courseId = event.pathParameters?.courseId;
+    const departmentId = event.pathParameters?.departmentId; 
     const requestBody = JSON.parse(event.body || "");
-
-    if (!courseId || !requestBody.studentId) {
+    
+    if (!departmentId || !requestBody.studentId) {
       return {
         statusCode: 400,
-        body: JSON.stringify({ error: "Missing required parameters" }),
+        body: JSON.stringify({ error: "Missing required parameters: departmentId or studentId" }), // 更新错误信息
       };
     }
 
     const params = {
       TableName: TABLE_NAME,
       Item: {
-        courseId: courseId,
+        courseId: departmentId, // 使用路径参数中的departmentId作为courseId
         studentId: requestBody.studentId,
-        enrollmentDate: new Date().toISOString(),
+        enrollmentDate: requestBody.enrollmentDate || new Date().toISOString(), // 使用请求体中的日期
         status: requestBody.status || "active",
       },
       ConditionExpression: "attribute_not_exists(courseId) AND attribute_not_exists(studentId)",

@@ -4,16 +4,14 @@ import { DynamoDB } from "aws-sdk";
 const dynamodb = new DynamoDB.DocumentClient();
 const TABLE_NAME = process.env.TABLE_NAME || "";
 
-export const handler = async (
-  event: APIGatewayProxyEvent
-): Promise<APIGatewayProxyResult> => {
+export const handler = async (event: APIGatewayProxyEvent) => {
   try {
-    const courseId = event.pathParameters?.courseId;
-
+    const courseId = event.pathParameters?.departmentId;
+    
     if (!courseId) {
       return {
         statusCode: 400,
-        body: JSON.stringify({ error: "Missing courseId parameter" }),
+        body: JSON.stringify({ error: "Course ID is required" }),
       };
     }
 
