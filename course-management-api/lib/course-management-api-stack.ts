@@ -327,50 +327,40 @@ export class CourseManagementApiStack extends cdk.Stack {
       }
     );
 
-    const courseEndpoint = coursesEndpoint.addResource("{departmentId}").addResource("{courseId}");  
-    const translationEndpoint = courseEndpoint.addResource("translation");  
+    const courseEndpoint = coursesEndpoint.addResource("{departmentId}").addResource("{courseId}"); 
     
-    translationEndpoint.addMethod(
-    "GET",
-    new apig.LambdaIntegration(translateCourseFn, { 
-    proxy: true,
-    requestParameters: {
-    'integration.request.path.departmentId': 'method.request.path.departmentId',
-    'integration.request.path.courseId': 'method.request.path.courseId',  
-    'integration.request.querystring.targetLanguage': 'method.request.querystring.targetLanguage'
-    }
-    }),
-    {
-    requestParameters: {
-    'method.request.path.departmentId': true,
-    'method.request.path.courseId': true, 
-    'method.request.querystring.targetLanguage': false
-    }
-    }
-    );
-
     courseEndpoint.addMethod(
       "DELETE",
       new apig.LambdaIntegration(deleteCourseFn, { 
         proxy: true,
         requestParameters: {
           'integration.request.path.departmentId': 'method.request.path.departmentId',
-          'integration.request.path.courseId': 'method.request.path.courseId'  
+          'integration.request.path.courseId': 'method.request.path.courseId'
         }
       }),
       {
         apiKeyRequired: true,
         requestParameters: {
           'method.request.path.departmentId': true,
-          'method.request.path.courseId': true  
+          'method.request.path.courseId': true
         }
       }
     );
     courseEndpoint.addMethod(
       "PUT",
-      new apig.LambdaIntegration(updateCourseFn, { proxy: true }),
+      new apig.LambdaIntegration(updateCourseFn, { 
+        proxy: true,
+        requestParameters: {
+          'integration.request.path.departmentId': 'method.request.path.departmentId',
+          'integration.request.path.courseId': 'method.request.path.courseId' 
+        }
+      }),
       {
-        apiKeyRequired: true
+        apiKeyRequired: true,
+        requestParameters: {
+          'method.request.path.departmentId': true,
+          'method.request.path.courseId': true 
+        }
       }
     );
 

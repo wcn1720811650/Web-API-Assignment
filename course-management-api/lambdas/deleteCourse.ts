@@ -9,7 +9,7 @@ export const handler = async (
 ): Promise<APIGatewayProxyResult> => {
   try {
     const departmentId = event.pathParameters?.departmentId;
-    const courseId = event.queryStringParameters?.courseId;
+    const courseId = event.pathParameters?.courseId;
 
     if (!departmentId || !courseId) {
       return {
