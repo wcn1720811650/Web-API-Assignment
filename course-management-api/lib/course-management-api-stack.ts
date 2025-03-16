@@ -6,7 +6,6 @@ import * as custom from "aws-cdk-lib/custom-resources";
 import * as apig from "aws-cdk-lib/aws-apigateway";
 import * as iam from 'aws-cdk-lib/aws-iam';
 import { Construct } from "constructs";
-import { generateBatch } from "../shared/util";
 import { courses, enrollments } from "../seed/courses";
 
 export class CourseManagementApiStack extends cdk.Stack {
@@ -158,23 +157,133 @@ export class CourseManagementApiStack extends cdk.Stack {
     
 
     // Initialize DynamoDB data
-    new custom.AwsCustomResource(this, "coursesddbInitData", {
-      onCreate: {
-        service: "DynamoDB",
-        action: "batchWriteItem",
-        parameters: {
-          RequestItems: {
-            [coursesTable.tableName]: generateBatch(courses),
-            [enrollmentsTable.tableName]: generateBatch(enrollments),
-          },
-        },
-        physicalResourceId: custom.PhysicalResourceId.of("coursesddbInitData"),
-      },
-      policy: custom.AwsCustomResourcePolicy.fromSdkCalls({
-        resources: [coursesTable.tableArn, enrollmentsTable.tableArn],
-      }),
-    });
+    console.log('Raw courses data:', courses);
+    console.log('Raw enrollments data:', enrollments);
 
+    const checkDataFormat = (data: any[], expectedKeys: string[]) => {
+      return data.every(item => 
+        expectedKeys.every(key => key in item)
+      );
+    };
+
+    const coursesExpectedKeys = ['departmentId', 'courseId', 'title', 'description', 'credits', 'isActive'];
+    const enrollmentsExpectedKeys = ['courseId', 'studentId', 'enrollmentDate', 'status'];
+
+    if (!checkDataFormat(courses, coursesExpectedKeys)) {
+      console.error('Courses data format is incorrect:', courses);
+    }
+
+    if (!checkDataFormat(enrollments, enrollmentsExpectedKeys)) {
+      console.error('Enrollments data format is incorrect:', enrollments);
+    }
+
+    const validateBatch = (batch: any[], partitionKey: string, sortKey?: string) => {
+      if (!Array.isArray(batch) || batch.length === 0) {
+        console.warn('Batch is not an array or is empty:', batch);
+        return [];
+      }
+      
+      try {
+        return batch.filter(item => 
+          item && 
+          item.PutRequest && 
+          item.PutRequest.Item && 
+          item.PutRequest.Item[partitionKey] &&
+          (!sortKey || item.PutRequest.Item[sortKey])  
+        );
+      } catch (error) {
+        console.error('Error validating batch:', error);
+        return [];
+      }
+    };
+
+    const createBatchItems = (items: any[], requiredFields: string[]) => {
+      if (!Array.isArray(items) || items.length === 0) {
+        console.warn('Empty or invalid items array:', items);
+        return [];
+      }
+      
+      console.log('Creating batch items from:', JSON.stringify(items, null, 2));
+      
+      return items.map((item, index) => {
+        const missingFields = requiredFields.filter(field => !item[field]);
+        if (missingFields.length > 0) {
+          console.error(`Missing required fields [${missingFields.join(', ')}] in item ${index}:`, item);
+          return null;
+        }
+        
+        try {
+          return {
+            PutRequest: {
+              Item: Object.fromEntries(
+                Object.entries(item).map(([key, value]) => [
+                  key,
+                  (() => {
+                    switch (typeof value) {
+                      case 'string': return { S: value };
+                      case 'number': return { N: value.toString() };
+                      case 'boolean': return { BOOL: value };
+                      default:
+                        console.error(`Unsupported type for ${key} in item ${index}:`, typeof value);
+                        return { NULL: true };
+                    }
+                  })()
+                ])
+              )
+            }
+          };
+        } catch (error) {
+          console.error(`Type conversion error in item ${index}:`, error);
+          return null;
+        }
+      }).filter(item => item !== null);
+    };
+
+    const coursesBatch = validateBatch(
+      createBatchItems(courses, ['departmentId', 'courseId']), 
+      "departmentId", 
+      "courseId"
+    );
+    
+    const enrollmentsBatch = validateBatch(
+      createBatchItems(enrollments, ['courseId', 'studentId']),
+      "courseId", 
+      "studentId"
+    );
+
+    if (coursesBatch.length === 0) {
+      console.error('No valid courses batch generated');
+    }
+    if (enrollmentsBatch.length === 0) {
+      console.error('No valid enrollments batch generated');
+    }
+
+    if (coursesBatch.length > 0 || enrollmentsBatch.length > 0) {
+      const requestItems: Record<string, any[]> = {};
+      
+      if (coursesBatch.length > 0) {
+        requestItems[coursesTable.tableName] = coursesBatch;
+      }
+      
+      if (enrollmentsBatch.length > 0) {
+        requestItems[enrollmentsTable.tableName] = enrollmentsBatch;
+      }
+      
+      new custom.AwsCustomResource(this, "coursesddbInitData", {
+        onCreate: {
+          service: "DynamoDB",
+          action: "batchWriteItem",
+          parameters: {
+            RequestItems: requestItems
+          },
+          physicalResourceId: custom.PhysicalResourceId.of("coursesddbInitData"),
+        },
+        policy: custom.AwsCustomResourcePolicy.fromSdkCalls({
+          resources: [coursesTable.tableArn, enrollmentsTable.tableArn],
+        })
+      });
+    }
+    
     
     // Permissions
     coursesTable.grantReadData(getCourseByIdFn);

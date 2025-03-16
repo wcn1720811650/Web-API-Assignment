@@ -2,7 +2,7 @@ export const courses = [
   {
     departmentId: "CS",
     courseId: "CS101",
-    name: "Introduction to Programming",
+    title: "Introduction to Programming", 
     description: "A beginner's guide to computer programming",
     credits: 5,
     isActive: true,
@@ -10,7 +10,7 @@ export const courses = [
   {
     departmentId: "CS",
     courseId: "CS102",
-    name: "Data Structures",
+    title: "Data Structures", 
     description: "Fundamental data structures and algorithms",
     credits: 5,
     isActive: true,
