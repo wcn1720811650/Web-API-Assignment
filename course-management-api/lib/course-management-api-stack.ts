@@ -327,16 +327,26 @@ export class CourseManagementApiStack extends cdk.Stack {
       }
     );
 
-    const courseEndpoint = coursesEndpoint.addResource("{departmentId}");
-    courseEndpoint.addMethod(
-      "GET",
-      new apig.LambdaIntegration(getCourseByIdFn, { proxy: true })
-    );
-
-    const translationEndpoint = courseEndpoint.addResource("translation");
+    const courseEndpoint = coursesEndpoint.addResource("{departmentId}").addResource("{courseId}");  
+    const translationEndpoint = courseEndpoint.addResource("translation");  
+    
     translationEndpoint.addMethod(
-      "GET",
-      new apig.LambdaIntegration(translateCourseFn, { proxy: true })
+    "GET",
+    new apig.LambdaIntegration(translateCourseFn, { 
+    proxy: true,
+    requestParameters: {
+    'integration.request.path.departmentId': 'method.request.path.departmentId',
+    'integration.request.path.courseId': 'method.request.path.courseId',  
+    'integration.request.querystring.targetLanguage': 'method.request.querystring.targetLanguage'
+    }
+    }),
+    {
+    requestParameters: {
+    'method.request.path.departmentId': true,
+    'method.request.path.courseId': true, 
+    'method.request.querystring.targetLanguage': false
+    }
+    }
     );
 
     courseEndpoint.addMethod(

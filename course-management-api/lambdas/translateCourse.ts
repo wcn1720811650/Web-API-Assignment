@@ -11,7 +11,7 @@ export const handler = async (
 ): Promise<APIGatewayProxyResult> => {
   try {
     const departmentId = event.pathParameters?.departmentId;
-    const courseId = event.queryStringParameters?.courseId;
+    const courseId = event.pathParameters?.courseId;
     const targetLanguage = event.queryStringParameters?.language || "zh";
 
     if (!departmentId || !courseId) {
