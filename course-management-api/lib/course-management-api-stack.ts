@@ -329,6 +329,26 @@ export class CourseManagementApiStack extends cdk.Stack {
 
     const courseEndpoint = coursesEndpoint.addResource("{departmentId}").addResource("{courseId}"); 
     
+    const translationEndpoint = courseEndpoint.addResource("translation");
+    translationEndpoint.addMethod(
+    "GET",
+    new apig.LambdaIntegration(translateCourseFn, {
+    proxy: true,
+    requestParameters: {
+    'integration.request.path.departmentId': 'method.request.path.departmentId',
+    'integration.request.path.courseId': 'method.request.path.courseId',
+    'integration.request.querystring.targetLanguage': 'method.request.querystring.targetLanguage'
+    }
+    }),
+    {
+    requestParameters: {
+    'method.request.path.departmentId': true,
+    'method.request.path.courseId': true,
+    'method.request.querystring.targetLanguage': true
+    }
+    }
+    );
+    
     courseEndpoint.addMethod(
       "DELETE",
       new apig.LambdaIntegration(deleteCourseFn, { 
@@ -365,22 +385,23 @@ export class CourseManagementApiStack extends cdk.Stack {
     );
 
     const enrollmentsEndpoint = courseEndpoint.addResource("enrollments");
-
     enrollmentsEndpoint.addMethod(
       "GET",
       new apig.LambdaIntegration(getEnrollmentsFn, {
         proxy: true,
         requestParameters: {
-          'integration.request.path.courseId': 'method.request.path.departmentId' 
+          'integration.request.path.departmentId': 'method.request.path.departmentId',
+          'integration.request.path.courseId': 'method.request.path.courseId'
         }
       }),
       {
         requestParameters: {
-          'method.request.path.departmentId': true 
+          'method.request.path.departmentId': true,
+          'method.request.path.courseId': true
         }
       }
     );
-    
+
     enrollmentsEndpoint.addMethod(
       "POST",
       new apig.LambdaIntegration(addEnrollmentFn, {

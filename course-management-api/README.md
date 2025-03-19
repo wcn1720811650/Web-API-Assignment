@@ -25,10 +25,19 @@ Table item attributes:
 ### App API endpoints.
 
 [ Provide a bullet-point list of the app's endpoints (excluding the Auth API) you have successfully implemented. ]
-+ POST /thing - add a new 'thing'.
 + GET https://ID.execute-api.eu-west-1.amazonaws.com/dev/courses - get all the courses.
 + DELETE https://ID.execute-api.eu-west-1.amazonaws.com/dev/courses/CS/CS101 - delete the specified course
 need api-key
++ POST https://ID.execute-api.eu-west-1.amazonaws.com/dev/courses - add a new course
+e.g.
+{
+    "departmentId": "MATH",
+    "courseId": "CS103",
+    "title": "Introduction to Programming", 
+    "description": "A beginner's guide to computer programming",
+    "credits": 6,
+    "isActive": true
+  }
 
 + PUT https://ID.execute-api.eu-west-1.amazonaws.com/dev/courses/CS/CS101 - update the specified course
 need api-key
